@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+.env
+.env.*
+
+# Downloaded tone/model artifacts
+smart_downloaded_tones/
+smart_tones/
+
