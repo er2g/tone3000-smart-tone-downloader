@@ -25,4 +25,4 @@ python allah.py
 ```
 
 Downloads go to `./smart_downloaded_tones/` by default (ignored by git).
-
+For `nam` platform tones, downloaded model files are saved with a `.nam` extension.
