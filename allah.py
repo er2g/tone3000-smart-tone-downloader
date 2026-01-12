@@ -117,6 +117,93 @@ class SmartToneDownloader:
 
         return basename
 
+    def _text_contains_boost(self, text: str) -> bool:
+        t = (text or "").lower()
+        if not t:
+            return False
+
+        keywords = (
+            "boost",
+            "boosted",
+            "overdrive",
+            "od ",
+            " od",
+            "tubescreamer",
+            "tube screamer",
+            "ts808",
+            "ts-808",
+            "ts9",
+            "ts-9",
+            "sd1",
+            "sd-1",
+            "klon",
+            "treble booster",
+            "rangemaster",
+        )
+        return any(k in t for k in keywords)
+
+    def _tone_contains_boost(self, tone: Dict) -> bool:
+        if (tone.get("gear") or "").lower() != "amp":
+            return False
+        text = f"{tone.get('title','')}\n{tone.get('description','')}"
+        return self._text_contains_boost(text)
+
+    def _tone_is_preamp_or_boost_pedal(self, tone: Dict) -> bool:
+        if (tone.get("gear") or "").lower() != "pedal":
+            return False
+        text = f"{tone.get('title','')}\n{tone.get('description','')}"
+        t = text.lower()
+        keywords = (
+            "preamp",
+            "boost",
+            "overdrive",
+            "tubescreamer",
+            "tube screamer",
+            "ts808",
+            "ts-808",
+            "ts9",
+            "ts-9",
+            "sd-1",
+            "sd1",
+            "klon",
+        )
+        return any(k in t for k in keywords)
+
+    def _postprocess_selected_indices(
+        self,
+        tones: List[Dict],
+        selected_indices: List[int],
+        max_selections: int,
+    ) -> List[int]:
+        indices = [i for i in selected_indices if 0 <= i < len(tones)]
+        seen = set()
+        indices = [i for i in indices if not (i in seen or seen.add(i))]
+
+        amp_has_boost = any(self._tone_contains_boost(tones[i]) for i in indices)
+        if amp_has_boost:
+            indices = [i for i in indices if not self._tone_is_preamp_or_boost_pedal(tones[i])]
+
+        if len(indices) >= max_selections:
+            return indices[:max_selections]
+
+        def is_allowed(i: int) -> bool:
+            if amp_has_boost and self._tone_is_preamp_or_boost_pedal(tones[i]):
+                return False
+            return True
+
+        remaining = [
+            i
+            for i in sorted(range(len(tones)), key=lambda j: tones[j].get("downloads_count", 0), reverse=True)
+            if i not in set(indices) and is_allowed(i)
+        ]
+
+        for i in remaining:
+            indices.append(i)
+            if len(indices) >= max_selections:
+                break
+
+        return indices
+
     def _parse_json_response(self, text: str) -> Dict:
         text = (text or "").strip()
         if not text:
@@ -194,9 +281,9 @@ Sadece JSON döndür, başka açıklama yapma.
         return analysis
     
     def select_best_tones(
-        self, 
-        user_request: str, 
-        tones: List[Dict], 
+        self,
+        user_request: str,
+        tones: List[Dict],
         max_selections: int = 3
     ) -> List[Dict]:
         """
@@ -212,40 +299,49 @@ Sadece JSON döndür, başka açıklama yapma.
                 "gear": tone["gear"],
                 "platform": tone["platform"],
                 "downloads": tone["downloads_count"],
-                "user": tone["user"]["username"]
+                "user": tone["user"]["username"],
+                "contains_boost_in_chain": self._tone_contains_boost(tone),
+                "is_preamp_or_boost_pedal": self._tone_is_preamp_or_boost_pedal(tone),
             }
             tone_summaries.append(summary)
-        
+
         prompt = f"""
 Kullanıcı şu tonu arıyor: "{user_request}"
 
 Bulunan tonlar:
 {json.dumps(tone_summaries, indent=2, ensure_ascii=False)}
 
-Bu tonlardan EN UYGUN {max_selections} tanesini seç. 
+Bu tonlardan EN UYGUN {max_selections} tanesini seç.
 Seçerken şunlara dikkat et:
 - Açıklama kullanıcının isteğine uyuyor mu?
 - İndirme sayısı yüksek mi (popüler mi)?
 - Ton ismi ve açıklaması ne kadar ilgili?
 - Kullanıcı spesifik bir müzisyen/şarkı istediyse, ona en yakın olan hangisi?
+- Eğer bir amfi simülasyonunun açıklamasında zaten boost/overdrive (örn. TS/SD-1/Klon) olduğu yazıyorsa, ayrıca preamp/boost pedalı seçme (redundant olmasın).
 
 JSON formatında sadece seçtiğin tonların INDEX numaralarını döndür:
 {{
-  "selected_indices": [0, 2, 5], 
+  "selected_indices": [0, 2, 5],
   "reasoning": "Hangi tonları neden seçtiğini detaylı açıkla. Eğer kullanıcının istediği ekipman bulunamadıysa, bunu belirt ve neden bu alternatifleri seçtiğini açıkla."
 }}
 
 Sadece JSON döndür, başka açıklama yapma.
 """
-        
+
         print(f"\n🤖 Gemini selecting best tones from {len(tones)} results...")
         selection = self._generate_json(prompt)
-        
+
         print(f"✓ Selected {len(selection['selected_indices'])} tones")
         print(f"  💡 {selection['reasoning']}")
-        
+
         # Seçilen tonları döndür
-        selected_tones = [tones[i] for i in selection['selected_indices'] if i < len(tones)]
+        raw_indices = selection.get("selected_indices") or []
+        indices = self._postprocess_selected_indices(
+            tones=tones,
+            selected_indices=raw_indices,
+            max_selections=max_selections,
+        )
+        selected_tones = [tones[i] for i in indices]
         return selected_tones
     
     def filter_models(
