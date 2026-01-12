@@ -9,8 +9,8 @@ env/
 
 .env
 .env.*
+keys.txt
 
 # Downloaded tone/model artifacts
 smart_downloaded_tones/
 smart_tones/
-

@@ -90,17 +90,44 @@ class TONE3000:
 
 
 class SmartToneDownloader:
+    _ANALYZE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "search_queries": {"type": "array", "items": {"type": "string"}, "max_items": 3},
+            "gear_type": {"type": "string", "enum": ["amp", "ir", "pedal"], "nullable": True},
+            "description": {"type": "string"},
+            "fallback_queries": {"type": "array", "items": {"type": "string"}, "max_items": 3},
+        },
+        "required": ["search_queries", "gear_type", "description", "fallback_queries"],
+    }
+
+    _SELECT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "selected_indices": {"type": "array", "items": {"type": "integer"}, "min_items": 1},
+        },
+        "required": ["selected_indices"],
+    }
+
+    _FILTER_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "selected_indices": {"type": "array", "items": {"type": "integer"}, "min_items": 1},
+        },
+        "required": ["selected_indices"],
+    }
+
     def __init__(self, tone3000_api_key: str, gemini_api_key: str):
         self.tone_client = TONE3000(api_key=tone3000_api_key)
-        
+
         # Gemini yapılandır
         genai.configure(api_key=gemini_api_key)
         self.model = genai.GenerativeModel("gemini-2.5-flash")
-        self._json_generation_config = GenerationConfig(
-            response_mime_type="application/json",
-            temperature=0,
-            max_output_tokens=2048,
-        )
+        self._json_generation_config_base = {
+            "response_mime_type": "application/json",
+            "temperature": 0,
+            "max_output_tokens": 1024,
+        }
         print("✓ Gemini 2.5 Flash initialized")
     
     def _safe_filename(self, name: str) -> str:
@@ -209,11 +236,14 @@ class SmartToneDownloader:
         if not text:
             raise ValueError("Empty Gemini response")
 
+        def loads_obj(raw: str) -> Dict:
+            value = json.loads(raw)
+            if not isinstance(value, dict):
+                raise ValueError("Gemini response JSON is not an object")
+            return value
+
         try:
-            value = json.loads(text)
-            if isinstance(value, dict):
-                return value
-            raise ValueError("Gemini response JSON is not an object")
+            return loads_obj(text)
         except json.JSONDecodeError:
             pass
 
@@ -221,6 +251,13 @@ class SmartToneDownloader:
             text = text.split("```json", 1)[1].split("```", 1)[0].strip()
         elif text.startswith("```"):
             text = text.split("```", 1)[1].split("```", 1)[0].strip()
+
+        text_single_line = text.replace("\r", "").replace("\n", " ").strip()
+        if text_single_line and text_single_line != text:
+            try:
+                return loads_obj(text_single_line)
+            except json.JSONDecodeError:
+                pass
 
         decoder = json.JSONDecoder()
         starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
@@ -235,12 +272,52 @@ class SmartToneDownloader:
 
         raise ValueError(f"Invalid JSON from Gemini: {text[:200]}")
 
-    def _generate_json(self, prompt: str) -> Dict:
-        response = self.model.generate_content(
-            prompt,
-            generation_config=self._json_generation_config,
-        )
-        return self._parse_json_response(getattr(response, "text", "") or "")
+    def _response_text(self, response) -> str:
+        text = getattr(response, "text", None)
+        if isinstance(text, str) and text.strip():
+            return text
+
+        try:
+            candidates = getattr(response, "candidates", None) or []
+            if not candidates:
+                return ""
+            parts = getattr(candidates[0].content, "parts", None) or []
+            chunks = []
+            for part in parts:
+                part_text = getattr(part, "text", None)
+                if isinstance(part_text, str):
+                    chunks.append(part_text)
+            return "".join(chunks).strip()
+        except Exception:
+            return (getattr(response, "text", "") or "").strip()
+
+    def _generate_json(self, prompt: str, schema: Optional[Dict] = None) -> Dict:
+        last_error: Optional[Exception] = None
+        for attempt in range(2):
+            attempt_prompt = prompt
+            if attempt == 1:
+                attempt_prompt = (
+                    prompt
+                    + "\n\nIMPORTANT: Your previous response was invalid JSON. "
+                    + "Return ONLY valid JSON that matches the required schema. "
+                    + "Do not include newlines inside string values."
+                )
+
+            response = self.model.generate_content(
+                attempt_prompt,
+                generation_config=GenerationConfig(
+                    **self._json_generation_config_base,
+                    response_schema=schema,
+                ),
+            )
+
+            text = self._response_text(response)
+            try:
+                return self._parse_json_response(text)
+            except Exception as e:
+                last_error = e
+
+        raise last_error if last_error else ValueError("Failed to get valid JSON from Gemini")
 
     def analyze_tone_request(self, user_request: str) -> Dict:
         """
@@ -249,10 +326,13 @@ class SmartToneDownloader:
         prompt = f"""
 Kullanıcı şu tonu arıyor: "{user_request}"
 
-Bu tonu elde etmek için hangi amfi/ekipman/IR aranmalı? 
-ÖNEMLİ: Sadece GERÇEKTEN popüler ve bulunması muhtemel ekipmanları ara. Eğer spesifik bir müzisyen/şarkı isteniyorsa, o müzisyenin GERÇEK setup'ını araştır.
-
-Lütfen JSON formatında şu bilgileri ver:
+Bu isteğe uygun ekipman/arama terimlerini çıkar.
+Kurallar:
+- Sadece popüler ve bulunması muhtemel ekipmanları seç.
+- `search_queries` en fazla 3 kısa arama terimi olsun.
+- `fallback_queries` en fazla 3 alternatif olsun.
+- `gear_type` sadece "amp" veya "ir" veya "pedal" veya null olsun.
+- Tüm string alanları tek satır olsun (newline yok).
 
 {{
   "search_queries": ["arama1", "arama2", "arama3"],  // En fazla 3 arama terimi (popüler ve bulunabilir olanlar)
@@ -261,16 +341,11 @@ Lütfen JSON formatında şu bilgileri ver:
   "fallback_queries": ["alternatif1", "alternatif2"]  // Alternatif/benzer tonlar için
 }}
 
-Örnek:
-- "Van Halen brown sound" için: {{"search_queries": ["peavey 5150", "EVH 5150"], "gear_type": "amp", "description": "Eddie Van Halen'ın ikonik high-gain brown sound tonu", "fallback_queries": ["marshall plexi", "kramer"]}}
-- "Chuck Schuldiner Spirit Crusher" için: {{"search_queries": ["crate blue voodoo", "valvestate 8100"], "gear_type": "amp", "description": "Death grubunun Spirit Crusher dönemindeki agresif, modern death metal tonu", "fallback_queries": ["peavey 5150", "mesa dual rectifier"]}}
-- "90'lar metal" için: {{"search_queries": ["mesa dual rectifier", "peavey 5150", "5150"], "gear_type": "amp", "description": "90'lar metal müziğinin high-gain karakteristik tonu", "fallback_queries": ["6505", "mesa boogie"]}}
-
 Sadece JSON döndür, başka açıklama yapma.
 """
-        
+
         print(f"\n🤖 Gemini analyzing request...")
-        analysis = self._generate_json(prompt)
+        analysis = self._generate_json(prompt, schema=self._ANALYZE_SCHEMA)
         
         print(f"✓ Analysis: {analysis['description']}")
         print(f"  Search queries: {', '.join(analysis['search_queries'])}")
@@ -289,17 +364,29 @@ Sadece JSON döndür, başka açıklama yapma.
         """
         Bulunan tonlardan en uygun olanları Gemini ile seç
         """
+        if not tones:
+            return []
+
+        # Prompt boyutunu sınırlamak için en popüler ilk N tonu değerlendir
+        max_candidates = 15
+        candidates = sorted(
+            tones,
+            key=lambda t: t.get("downloads_count", 0) or 0,
+            reverse=True,
+        )[:max_candidates]
+
         # Tonları Gemini'ye göstermek için özetle
         tone_summaries = []
-        for i, tone in enumerate(tones):
+        for i, tone in enumerate(candidates):
+            desc = (tone.get("description") or "No description").replace("\r", " ").replace("\n", " ")
+            desc = desc[:160]
             summary = {
                 "index": i,
                 "title": tone["title"],
-                "description": tone.get("description") or "No description",
+                "description": desc,
                 "gear": tone["gear"],
                 "platform": tone["platform"],
                 "downloads": tone["downloads_count"],
-                "user": tone["user"]["username"],
                 "contains_boost_in_chain": self._tone_contains_boost(tone),
                 "is_preamp_or_boost_pedal": self._tone_is_preamp_or_boost_pedal(tone),
             }
@@ -309,7 +396,7 @@ Sadece JSON döndür, başka açıklama yapma.
 Kullanıcı şu tonu arıyor: "{user_request}"
 
 Bulunan tonlar:
-{json.dumps(tone_summaries, indent=2, ensure_ascii=False)}
+{json.dumps(tone_summaries, ensure_ascii=False, separators=(',', ':'))}
 
 Bu tonlardan EN UYGUN {max_selections} tanesini seç.
 Seçerken şunlara dikkat et:
@@ -318,35 +405,35 @@ Seçerken şunlara dikkat et:
 - Ton ismi ve açıklaması ne kadar ilgili?
 - Kullanıcı spesifik bir müzisyen/şarkı istediyse, ona en yakın olan hangisi?
 - Eğer bir amfi simülasyonunun açıklamasında zaten boost/overdrive (örn. TS/SD-1/Klon) olduğu yazıyorsa, ayrıca preamp/boost pedalı seçme (redundant olmasın).
+- Sadece listelenen indeksleri seç.
 
 JSON formatında sadece seçtiğin tonların INDEX numaralarını döndür:
 {{
-  "selected_indices": [0, 2, 5],
-  "reasoning": "Hangi tonları neden seçtiğini detaylı açıkla. Eğer kullanıcının istediği ekipman bulunamadıysa, bunu belirt ve neden bu alternatifleri seçtiğini açıkla."
+  "selected_indices": [0, 2, 5]
 }}
 
 Sadece JSON döndür, başka açıklama yapma.
 """
 
         print(f"\n🤖 Gemini selecting best tones from {len(tones)} results...")
-        selection = self._generate_json(prompt)
+        selection = self._generate_json(prompt, schema=self._SELECT_SCHEMA)
 
-        print(f"✓ Selected {len(selection['selected_indices'])} tones")
-        print(f"  💡 {selection['reasoning']}")
+        selected_indices = selection.get("selected_indices") or []
+        print(f"✓ Selected {len(selected_indices)} tones")
 
         # Seçilen tonları döndür
-        raw_indices = selection.get("selected_indices") or []
+        raw_indices = selected_indices
         indices = self._postprocess_selected_indices(
-            tones=tones,
+            tones=candidates,
             selected_indices=raw_indices,
             max_selections=max_selections,
         )
-        selected_tones = [tones[i] for i in indices]
+        selected_tones = [candidates[i] for i in indices]
         return selected_tones
     
     def filter_models(
-        self, 
-        user_request: str, 
+        self,
+        user_request: str,
         tone_title: str,
         tone_description: str,
         models: List[Dict]
@@ -370,7 +457,7 @@ Ton: "{tone_title}"
 Açıklama: "{tone_description}"
 
 Bu ton için şu modeller mevcut:
-{json.dumps(model_summaries, indent=2, ensure_ascii=False)}
+{json.dumps(model_summaries, ensure_ascii=False, separators=(',', ':'))}
 
 Bu tonun SADECE kullanıcının ihtiyacı olan modellerini seç.
 Örneğin:
@@ -383,19 +470,19 @@ Bu tonun SADECE kullanıcının ihtiyacı olan modellerini seç.
 
 Maksimum 5 model seç.
 
-JSON formatında sadece seçtiğin modellerin INDEX numaralarını döndür:
-{{"selected_indices": [0, 2], "reasoning": "Kısa ve öz - neden bu modeller seçildi (max 1 cümle)"}}
+JSON formatında sadece seçtiğin modellerin INDEX numaralarını döndür:    
+{{"selected_indices": [0, 2]}}
 
 Sadece JSON döndür, başka açıklama yapma.
 """
+
+        selection = self._generate_json(prompt, schema=self._FILTER_SCHEMA)
         
-        selection = self._generate_json(prompt)
-        
-        print(f"    🤖 Selected {len(selection['selected_indices'])} models")
-        print(f"       💡 {selection['reasoning']}")
-        
+        selected_indices = selection.get("selected_indices") or []
+        print(f"    🤖 Selected {len(selected_indices)} models")
+
         # Seçilen modelleri döndür
-        selected_models = [models[i] for i in selection['selected_indices'] if i < len(models)]
+        selected_models = [models[i] for i in selected_indices if i < len(models)]
         return selected_models
     
     def smart_download(
