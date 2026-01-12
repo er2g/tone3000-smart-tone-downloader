@@ -5,6 +5,8 @@ Python CLI that searches Tone3000 and uses Gemini to:
 - pick the best matching tones/models,
 - download selected model files into a local folder.
 
+Gemini model: `gemini-2.5-flash` (responses requested as `application/json`).
+
 ## Setup
 
 Install deps:

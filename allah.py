@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from typing import List, Dict, Optional
 import google.generativeai as genai
+from google.generativeai.types import GenerationConfig
 
 class TONE3000:
     BASE_URL = "https://www.tone3000.com/api/v1"
@@ -94,8 +95,13 @@ class SmartToneDownloader:
         
         # Gemini yapılandır
         genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        print(f"✓ Gemini 2.5 Flash initialized")
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self._json_generation_config = GenerationConfig(
+            response_mime_type="application/json",
+            temperature=0,
+            max_output_tokens=2048,
+        )
+        print("✓ Gemini 2.5 Flash initialized")
     
     def _safe_filename(self, name: str) -> str:
         safe = re.sub(r'[<>:"/\\\\|?*\\x00-\\x1F]', "_", name).strip(" .")
@@ -110,6 +116,44 @@ class SmartToneDownloader:
             return f"{basename}.nam"
 
         return basename
+
+    def _parse_json_response(self, text: str) -> Dict:
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("Empty Gemini response")
+
+        try:
+            value = json.loads(text)
+            if isinstance(value, dict):
+                return value
+            raise ValueError("Gemini response JSON is not an object")
+        except json.JSONDecodeError:
+            pass
+
+        if text.startswith("```json"):
+            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif text.startswith("```"):
+            text = text.split("```", 1)[1].split("```", 1)[0].strip()
+
+        decoder = json.JSONDecoder()
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        if starts:
+            start = min(starts)
+            try:
+                value, _ = decoder.raw_decode(text[start:])
+                if isinstance(value, dict):
+                    return value
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError(f"Invalid JSON from Gemini: {text[:200]}")
+
+    def _generate_json(self, prompt: str) -> Dict:
+        response = self.model.generate_content(
+            prompt,
+            generation_config=self._json_generation_config,
+        )
+        return self._parse_json_response(getattr(response, "text", "") or "")
 
     def analyze_tone_request(self, user_request: str) -> Dict:
         """
@@ -139,17 +183,7 @@ Sadece JSON döndür, başka açıklama yapma.
 """
         
         print(f"\n🤖 Gemini analyzing request...")
-        response = self.model.generate_content(prompt)
-        
-        # JSON parse et
-        text = response.text.strip()
-        # Markdown kod bloğu varsa temizle
-        if text.startswith("```json"):
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif text.startswith("```"):
-            text = text.split("```")[1].split("```")[0].strip()
-        
-        analysis = json.loads(text)
+        analysis = self._generate_json(prompt)
         
         print(f"✓ Analysis: {analysis['description']}")
         print(f"  Search queries: {', '.join(analysis['search_queries'])}")
@@ -205,16 +239,7 @@ Sadece JSON döndür, başka açıklama yapma.
 """
         
         print(f"\n🤖 Gemini selecting best tones from {len(tones)} results...")
-        response = self.model.generate_content(prompt)
-        
-        # JSON parse et
-        text = response.text.strip()
-        if text.startswith("```json"):
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif text.startswith("```"):
-            text = text.split("```")[1].split("```")[0].strip()
-        
-        selection = json.loads(text)
+        selection = self._generate_json(prompt)
         
         print(f"✓ Selected {len(selection['selected_indices'])} tones")
         print(f"  💡 {selection['reasoning']}")
@@ -268,16 +293,7 @@ JSON formatında sadece seçtiğin modellerin INDEX numaralarını döndür:
 Sadece JSON döndür, başka açıklama yapma.
 """
         
-        response = self.model.generate_content(prompt)
-        
-        # JSON parse et
-        text = response.text.strip()
-        if text.startswith("```json"):
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif text.startswith("```"):
-            text = text.split("```")[1].split("```")[0].strip()
-        
-        selection = json.loads(text)
+        selection = self._generate_json(prompt)
         
         print(f"    🤖 Selected {len(selection['selected_indices'])} models")
         print(f"       💡 {selection['reasoning']}")
