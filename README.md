@@ -1,21 +1,27 @@
-# TONE3000 Smart Tone Downloader (Gemini)
+# Tone Sherpa
 
-Python CLI that searches Tone3000 and uses Gemini to:
-- analyze a free-text tone request,
-- pick the best matching tones/models,
-- download selected model files into a local folder.
+AI-assisted Tone3000 downloader that interprets a free-text tone request, discovers matching profiles, and downloads selected model files.
 
-Gemini model: `gemini-2.5-flash` (responses requested as `application/json`).
+## Features
 
-## Setup
+- Query parsing with Gemini (`gemini-2.5-flash`)
+- Tone3000 API search and filtering
+- Interactive candidate selection flow
+- Automatic file download into local output folder
 
-Install deps:
+## Requirements
+
+- Python 3.9+
+- Tone3000 API key
+- Gemini API key
+
+## Install
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-Set API keys (recommended):
+## Environment
 
 - `TONE3000_API_KEY`
 - `GEMINI_API_KEY`
@@ -26,5 +32,13 @@ Set API keys (recommended):
 python allah.py
 ```
 
-Downloads go to `./smart_downloaded_tones/` by default (ignored by git).
-For `nam` platform tones, downloaded model files are saved with a `.nam` extension.
+Default download location:
+
+```text
+./smart_downloaded_tones/
+```
+
+## Project Layout
+
+- `allah.py`: CLI entrypoint
+- `scripts/`: helper utilities
