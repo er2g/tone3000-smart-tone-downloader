@@ -1,6 +1,6 @@
 [package]
 name = "tone3000_smart_tauri"
-version = "0.1.0"
+version = "0.2.1"
 description = "Premium desktop UI for TONE3000 Smart Tone Downloader"
 authors = ["er2g"]
 edition = "2021"

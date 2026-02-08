@@ -18,7 +18,7 @@ python -m pip install -r requirements.txt
 Tauri CLI bağımlılığı:
 
 ```bash
-npm install
+npm install --include=dev
 ```
 
 API key sağlama yöntemleri:
@@ -60,6 +60,10 @@ Arayüz özellikleri:
 npm run tauri:check
 npm run tauri:build
 ```
+
+Linux release build (`.deb`) çıktısı:
+
+- `src-tauri/target/release/bundle/deb/Tone3000 Smart Tone Downloader_<version>_amd64.deb`
 
 ## Çıktılar
 

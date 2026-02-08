@@ -12,6 +12,7 @@ env/
 keys.txt
 node_modules/
 src-tauri/target/
+dist/
 
 # Downloaded tone/model artifacts
 smart_downloaded_tones/

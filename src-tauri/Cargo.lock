@@ -3523,7 +3523,7 @@ checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
 
 [[package]]
 name = "tone3000_smart_tauri"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
