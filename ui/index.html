@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TONE3000 Smart Tone Downloader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+    <main class="app-shell">
+      <section class="left-column glass">
+        <header class="hero">
+          <p class="eyebrow">ALLAH+ PREMIUM PLUS</p>
+          <h1>TONE3000 Smart Tone Studio</h1>
+          <p class="subtitle">
+            Preset seç, anahtarları gir, tek tuşla AI analiz + model indirme akışını masaüstünden yönet.
+          </p>
+        </header>
+
+        <section class="panel">
+          <div class="panel-top">
+            <h2>Preset Bank</h2>
+            <span class="pill" id="selectedPresetLabel">Preset: Seçilmedi</span>
+          </div>
+          <div id="presetGrid" class="preset-grid"></div>
+        </section>
+
+        <section class="panel form-panel">
+          <h2>Görev Konfigürasyonu</h2>
+          <label for="tone3000Key">TONE3000 API Key</label>
+          <input id="tone3000Key" type="password" placeholder="UUID formatında API key" />
+
+          <label for="geminiKey">Gemini API Key</label>
+          <input id="geminiKey" type="password" placeholder="AIza... ile başlayan key" />
+
+          <label for="toneRequest">Tone isteği</label>
+          <textarea id="toneRequest" rows="4" placeholder="Örn: Steve Vai lead tonu ama modern ve sıkı mids"></textarea>
+
+          <div class="inline-fields">
+            <div>
+              <label for="outputDir">Output klasörü</label>
+              <input id="outputDir" type="text" value="./smart_downloaded_tones" />
+            </div>
+            <div>
+              <label for="maxTones">Maks ton sayısı</label>
+              <input id="maxTones" type="number" min="1" max="5" value="3" />
+            </div>
+            <div>
+              <label for="maxResults">Aday ton limiti</label>
+              <input id="maxResults" type="number" min="5" max="25" value="15" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="runButton" class="btn btn-primary">Smart Download Başlat</button>
+            <button id="clearLogsButton" class="btn btn-ghost">Logları Temizle</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="right-column">
+        <section class="glass panel status-panel">
+          <div>
+            <h2>Çalışma Durumu</h2>
+            <p id="statusText">Hazır. Bir preset seçip işlemi başlatabilirsin.</p>
+          </div>
+          <span class="run-state idle" id="runState">Idle</span>
+        </section>
+
+        <section class="glass panel">
+          <h2>Analiz Özeti</h2>
+          <p id="analysisSummary">Henüz analiz yapılmadı.</p>
+          <div id="analysisMeta" class="meta-row"></div>
+        </section>
+
+        <section class="glass panel">
+          <h2>Seçilen Tonlar</h2>
+          <div id="selectedToneList" class="tone-list empty">İşlem sonrası burada görünecek.</div>
+        </section>
+
+        <section class="glass panel">
+          <h2>İndirilen Modeller</h2>
+          <div id="modelList" class="model-list empty">Henüz model indirilmedi.</div>
+        </section>
+
+        <section class="glass panel">
+          <h2>Çıktı Logları</h2>
+          <pre id="logOutput">Log bekleniyor...</pre>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

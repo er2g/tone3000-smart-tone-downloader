@@ -10,6 +10,8 @@ env/
 .env
 .env.*
 keys.txt
+node_modules/
+src-tauri/target/
 
 # Downloaded tone/model artifacts
 smart_downloaded_tones/

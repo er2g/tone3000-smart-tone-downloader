@@ -1,0 +1,20 @@
+[package]
+name = "tone3000_smart_tauri"
+version = "0.1.0"
+description = "Premium desktop UI for TONE3000 Smart Tone Downloader"
+authors = ["er2g"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.4" }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2.1.1" }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+strip = true
