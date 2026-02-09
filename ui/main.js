@@ -1,41 +1,4 @@
-const presets = [
-  {
-    id: "tight-metal",
-    title: "Tight Metal Wall",
-    vibe: "Palm mute net, baskin ritim metal",
-    request: "Modern tight high gain rhythm tone with aggressive mids for palm-muted riffs",
-    maxTones: 3,
-    maxResults: 16,
-  },
-  {
-    id: "jazz-clean",
-    title: "Glass Jazz Clean",
-    vibe: "Parlak ama kontrollü clean ton",
-    request: "Hi-fi clean guitar tone with airy top-end, soft compression, and lush sustain for jazz fusion",
-    maxTones: 2,
-    maxResults: 12,
-  },
-  {
-    id: "vintage-crunch",
-    title: "Vintage Crunch 70s",
-    vibe: "Klasik rock crunch + orta gain",
-    request: "70s British crunchy amp tone with warm mids and dynamic response",
-    maxTones: 3,
-    maxResults: 15,
-  },
-  {
-    id: "lead-shred",
-    title: "Arena Lead Hero",
-    vibe: "Lead odakli, singing sustain",
-    request: "Singing high-gain lead tone with smooth top end and long sustain for melodic solos",
-    maxTones: 4,
-    maxResults: 20,
-  },
-];
-
 const el = {
-  presetGrid: document.getElementById("presetGrid"),
-  selectedPresetLabel: document.getElementById("selectedPresetLabel"),
   tone3000Key: document.getElementById("tone3000Key"),
   geminiKey: document.getElementById("geminiKey"),
   toneRequest: document.getElementById("toneRequest"),
@@ -53,7 +16,6 @@ const el = {
   logOutput: document.getElementById("logOutput"),
 };
 
-let selectedPresetId = null;
 let isRunning = false;
 
 function escapeHtml(value) {
@@ -63,41 +25,10 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
-function getPresetById(id) {
-  return presets.find((preset) => preset.id === id);
-}
-
 function setRunState(kind, text) {
   el.runState.className = `run-state ${kind}`;
   el.runState.textContent = kind === "running" ? "Running" : kind.charAt(0).toUpperCase() + kind.slice(1);
   el.statusText.textContent = text;
-}
-
-function renderPresetCards() {
-  el.presetGrid.innerHTML = presets
-    .map(
-      (preset) => `
-      <button type="button" class="preset-card ${preset.id === selectedPresetId ? "active" : ""}" data-id="${preset.id}">
-        <div class="title">${escapeHtml(preset.title)}</div>
-        <div class="vibe">${escapeHtml(preset.vibe)}</div>
-      </button>
-    `
-    )
-    .join("");
-
-  for (const node of el.presetGrid.querySelectorAll(".preset-card")) {
-    node.addEventListener("click", () => {
-      const id = node.dataset.id;
-      const preset = getPresetById(id);
-      if (!preset) return;
-      selectedPresetId = id;
-      el.selectedPresetLabel.textContent = `Preset: ${preset.title}`;
-      el.toneRequest.value = preset.request;
-      el.maxTones.value = String(preset.maxTones);
-      el.maxResults.value = String(preset.maxResults);
-      renderPresetCards();
-    });
-  }
 }
 
 function renderAnalysis(analysis, poolSize) {
@@ -247,7 +178,6 @@ function onClearLogs() {
 }
 
 function init() {
-  renderPresetCards();
   renderAnalysis(null);
   renderTones([]);
   renderModels([]);
