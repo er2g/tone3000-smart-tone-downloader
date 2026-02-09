@@ -20,29 +20,32 @@
           <p class="eyebrow">ALLAH+ PREMIUM PLUS</p>
           <h1>TONE3000 Smart Tone Studio</h1>
           <p class="subtitle">
-            Anahtarları gir, tone isteğini yaz, tek tuşla AI analiz + model indirme akışını masaüstünden yönet.
+            Anahtarlari gir, tone istegini yaz, tek tusla AI analiz + model indirme akisina basla.
           </p>
         </header>
 
         <section class="panel form-panel">
-          <h2>Görev Konfigürasyonu</h2>
+          <h2>Gorev Konfigurasyonu</h2>
           <label for="tone3000Key">TONE3000 API Key</label>
-          <input id="tone3000Key" type="password" placeholder="UUID formatında API key" />
+          <input id="tone3000Key" type="password" placeholder="UUID formatinda API key" />
 
           <label for="geminiKey">Gemini API Key</label>
-          <input id="geminiKey" type="password" placeholder="AIza... ile başlayan key" />
+          <input id="geminiKey" type="password" placeholder="AIza... ile baslayan key" />
 
-          <label for="toneRequest">Tone isteği</label>
-          <textarea id="toneRequest" rows="4" placeholder="Örn: Steve Vai lead tonu ama modern ve sıkı mids"></textarea>
+          <label for="geminiModel">Gemini modeli</label>
+          <input id="geminiModel" type="text" value="gemini-2.5-pro" placeholder="orn: gemini-2.5-pro" />
+
+          <label for="toneRequest">Tone istegi</label>
+          <textarea id="toneRequest" rows="4" placeholder="Orn: Metallica Enter Sandman benzeri beginner-friendly ritim tonu"></textarea>
 
           <div class="inline-fields">
             <div>
-              <label for="outputDir">Output klasörü</label>
+              <label for="outputDir">Output klasoru</label>
               <input id="outputDir" type="text" value="./smart_downloaded_tones" />
             </div>
             <div>
-              <label for="maxTones">Maks ton sayısı</label>
-              <input id="maxTones" type="number" min="1" max="5" value="3" />
+              <label for="maxTones">Preset sayisi</label>
+              <input id="maxTones" type="number" min="1" max="5" value="4" />
             </div>
             <div>
               <label for="maxResults">Aday ton limiti</label>
@@ -51,8 +54,8 @@
           </div>
 
           <div class="actions">
-            <button id="runButton" class="btn btn-primary">Smart Download Başlat</button>
-            <button id="clearLogsButton" class="btn btn-ghost">Logları Temizle</button>
+            <button id="runButton" class="btn btn-primary">Smart Download Baslat</button>
+            <button id="clearLogsButton" class="btn btn-ghost">Loglari Temizle</button>
           </div>
         </section>
       </section>
@@ -60,30 +63,35 @@
       <section class="right-column">
         <section class="glass panel status-panel">
           <div>
-            <h2>Çalışma Durumu</h2>
-            <p id="statusText">Hazır. Tone isteğini girip işlemi başlatabilirsin.</p>
+            <h2>Calisma Durumu</h2>
+            <p id="statusText">Hazir. Tone istegini girip islemi baslatabilirsin.</p>
           </div>
           <span class="run-state idle" id="runState">Idle</span>
         </section>
 
         <section class="glass panel">
-          <h2>Analiz Özeti</h2>
-          <p id="analysisSummary">Henüz analiz yapılmadı.</p>
+          <h2>Analiz Ozeti</h2>
+          <p id="analysisSummary">Henuz analiz yapilmadi.</p>
           <div id="analysisMeta" class="meta-row"></div>
         </section>
 
         <section class="glass panel">
-          <h2>Seçilen Tonlar</h2>
-          <div id="selectedToneList" class="tone-list empty">İşlem sonrası burada görünecek.</div>
+          <h2>AI Adimlari</h2>
+          <div id="aiStepList" class="ai-steps empty">Adim aciklamalari islem sonrasi burada gorunecek.</div>
         </section>
 
         <section class="glass panel">
-          <h2>İndirilen Modeller</h2>
-          <div id="modelList" class="model-list empty">Henüz model indirilmedi.</div>
+          <h2>Rig Presetleri</h2>
+          <div id="selectedToneList" class="tone-list empty">Islem sonrasi burada gorunecek.</div>
         </section>
 
         <section class="glass panel">
-          <h2>Çıktı Logları</h2>
+          <h2>Indirilen Modeller</h2>
+          <div id="modelList" class="model-list empty">Henuz model indirilmedi.</div>
+        </section>
+
+        <section class="glass panel">
+          <h2>Cikti Loglari</h2>
           <pre id="logOutput">Log bekleniyor...</pre>
         </section>
       </section>

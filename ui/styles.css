@@ -221,19 +221,22 @@ textarea:focus {
 }
 
 .tone-list,
-.model-list {
+.model-list,
+.ai-steps {
   display: grid;
   gap: 8px;
 }
 
 .tone-list.empty,
-.model-list.empty {
+.model-list.empty,
+.ai-steps.empty {
   color: var(--text-muted);
   font-size: 0.9rem;
 }
 
 .tone-item,
-.model-item {
+.model-item,
+.ai-step-item {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 10px;
@@ -249,6 +252,18 @@ textarea:focus {
   margin-top: 5px;
   color: var(--text-muted);
   font-size: 0.82rem;
+}
+
+.ai-step-item .name {
+  font-weight: 700;
+}
+
+.ai-step-item .meta {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .model-item.downloaded {

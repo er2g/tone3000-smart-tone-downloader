@@ -1,10 +1,12 @@
 # TONE3000 Smart Tone Downloader (Rust + Tauri)
 
-Bu proje artık tamamen Rust tabanlıdır.
+Bu proje Rust + Tauri ile calisir.
 
-- Backend akışı: Rust (`src-tauri/src/main.rs`)
-- Desktop arayüz: Tauri + vanilla UI (`ui/`)
-- AI modeli: `gemini-2.5-flash` (JSON yanıt)
+- Backend akis: `src-tauri/src/main.rs`
+- Desktop arayuz: `ui/`
+- Varsayilan AI modeli: `gemini-2.5-pro`
+- UI uzerinden esnek model secimi: `Gemini modeli` alani
+- Rig odakli akis: her preset icin amp + (gerekiyorsa) cab/IR secimi
 
 ## Kurulum
 
@@ -12,17 +14,19 @@ Bu proje artık tamamen Rust tabanlıdır.
 npm install --include=dev
 ```
 
-API key sağlama yöntemleri:
+## API key saglama yontemleri
 
-1. Arayüzden alanlara girerek (önerilen)
-2. Ortam değişkenleri:
+1. UI alanlarindan girerek
+2. Ortam degiskenleri:
    - `TONE3000_API_KEY`
    - `GEMINI_API_KEY`
-3. İsteğe bağlı `keys.txt` içinde:
+3. `keys.txt` dosyasindan (repo koku):
    - `TONE3000_API_KEY=...`
    - `GEMINI_API_KEY=...`
 
-## Çalıştırma
+`keys.txt` varsa ve UI alanlari bos birakilirsa otomatik kullanilir.
+
+## Calistirma
 
 ```bash
 npm run tauri:dev
@@ -35,24 +39,21 @@ npm run tauri:check
 npm run tauri:build
 ```
 
-Linux release build (`.deb`) çıktısı:
+## AI adim aciklamalari
 
-- `src-tauri/target/release/bundle/deb/Tone3000 Smart Tone Downloader_<version>_amd64.deb`
+Guncel surumde AI karar akisi adim adim doner:
 
-## Akış
+1. Istek analizi
+2. Amp arama ve preset bazli secim
+3. Her amp icin cab/IR gereksinimi karari
+4. Gerekiyorsa amp + cab eslestirmesi
+5. Bilesen bazli model filtreleme ve indirme ozeti
 
-Genel işleyiş korunmuştur:
+Bu adimlar UI'da `AI Adimlari` panelinde gorunur.
 
-1. Gemini ile tone isteği analizi (`search_queries`, `fallback_queries`, `gear_type`)
-2. Tone3000 araması ve aday havuz oluşturma
-3. Gemini ile en iyi tone seçimi
-4. Her tone için model listesi çekme
-5. Gemini ile model filtreleme
-6. Model dosyalarını indirme + sonuçları UI’da gösterme
+## Ciktilar
 
-## Çıktılar
+Varsayilan indirme dizini: `./smart_downloaded_tones/`
 
-Varsayılan indirme dizini `./smart_downloaded_tones/` klasörüdür (gitignore).
-
-- `nam` platformundaki model dosyaları `.nam` uzantısıyla kaydedilir.
-- Her seçilen tone klasörü içinde `info.json` oluşturulur.
+- `nam` platformundaki model dosyalari `.nam` uzantisiyla kaydedilir.
+- Her secilen tone klasoru icinde `info.json` olusur.

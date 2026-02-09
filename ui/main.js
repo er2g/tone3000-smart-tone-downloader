@@ -1,6 +1,7 @@
 const el = {
   tone3000Key: document.getElementById("tone3000Key"),
   geminiKey: document.getElementById("geminiKey"),
+  geminiModel: document.getElementById("geminiModel"),
   toneRequest: document.getElementById("toneRequest"),
   outputDir: document.getElementById("outputDir"),
   maxTones: document.getElementById("maxTones"),
@@ -11,6 +12,7 @@ const el = {
   runState: document.getElementById("runState"),
   analysisSummary: document.getElementById("analysisSummary"),
   analysisMeta: document.getElementById("analysisMeta"),
+  aiStepList: document.getElementById("aiStepList"),
   selectedToneList: document.getElementById("selectedToneList"),
   modelList: document.getElementById("modelList"),
   logOutput: document.getElementById("logOutput"),
@@ -31,14 +33,15 @@ function setRunState(kind, text) {
   el.statusText.textContent = text;
 }
 
-function renderAnalysis(analysis, poolSize) {
+function renderAnalysis(analysis, poolSize, modelName) {
   if (!analysis) {
-    el.analysisSummary.textContent = "Henüz analiz yapılmadı.";
+    el.analysisSummary.textContent = "Henuz analiz yapilmadi.";
     el.analysisMeta.innerHTML = "";
     return;
   }
-  el.analysisSummary.textContent = analysis.description || "Analiz tamamlandı.";
+  el.analysisSummary.textContent = analysis.description || "Analiz tamamlandi.";
   const chips = [];
+  if (modelName) chips.push(`Model: ${modelName}`);
   if (analysis.gear_type) chips.push(`Gear: ${analysis.gear_type}`);
   if (poolSize !== undefined) chips.push(`Pool: ${poolSize}`);
   for (const query of analysis.search_queries || []) chips.push(`Q: ${query}`);
@@ -46,10 +49,52 @@ function renderAnalysis(analysis, poolSize) {
   el.analysisMeta.innerHTML = chips.map((chip) => `<span class="meta-chip">${escapeHtml(chip)}</span>`).join("");
 }
 
-function renderTones(tones) {
-  if (!tones || tones.length === 0) {
+function renderAiSteps(steps) {
+  if (!steps || steps.length === 0) {
+    el.aiStepList.className = "ai-steps empty";
+    el.aiStepList.textContent = "AI adimlari bulunamadi.";
+    return;
+  }
+
+  el.aiStepList.className = "ai-steps";
+  el.aiStepList.innerHTML = steps
+    .map((step) => {
+      const details = (step.details || []).map((line) => `<li>${escapeHtml(line)}</li>`).join("");
+      return `
+      <article class="ai-step-item">
+        <div class="name">Adim ${escapeHtml(step.step ?? "?")} - ${escapeHtml(step.title || "AI step")}</div>
+        <ul class="meta">${details || "<li>Detay yok.</li>"}</ul>
+      </article>
+    `;
+    })
+    .join("");
+}
+
+function renderTones(rigs, fallbackTones) {
+  if (rigs && rigs.length > 0) {
+    el.selectedToneList.className = "tone-list";
+    el.selectedToneList.innerHTML = rigs
+      .map(
+        (rig) => `
+      <article class="tone-item">
+        <div class="name">${escapeHtml(rig.preset || "Preset")} - ${escapeHtml(rig.amp?.title || "Amp")}</div>
+        <div class="meta">
+          Amp: ${escapeHtml(rig.amp?.gear || "amp")} - ${escapeHtml(rig.amp?.platform || "unknown")}
+        </div>
+        <div class="meta">
+          Cab: ${rig.cab ? escapeHtml(rig.cab.title || "Cab/IR") : "Gerekmiyor"}
+        </div>
+      </article>
+    `
+      )
+      .join("");
+    return;
+  }
+
+  const tones = fallbackTones || [];
+  if (tones.length === 0) {
     el.selectedToneList.className = "tone-list empty";
-    el.selectedToneList.textContent = "Seçilen ton yok.";
+    el.selectedToneList.textContent = "Secilen rig yok.";
     return;
   }
 
@@ -60,7 +105,7 @@ function renderTones(tones) {
       <article class="tone-item">
         <div class="name">${escapeHtml(tone.title || "Untitled Tone")}</div>
         <div class="meta">
-          ${escapeHtml(tone.gear || "unknown")} • ${escapeHtml(tone.platform || "unknown")} • ${
+          ${escapeHtml(tone.gear || "unknown")} - ${escapeHtml(tone.platform || "unknown")} - ${
             tone.downloads_count ?? 0
           } indirime sahip
         </div>
@@ -73,7 +118,7 @@ function renderTones(tones) {
 function renderModels(models) {
   if (!models || models.length === 0) {
     el.modelList.className = "model-list empty";
-    el.modelList.textContent = "İndirilen model bulunmuyor.";
+    el.modelList.textContent = "Indirilen model bulunmuyor.";
     return;
   }
 
@@ -84,7 +129,7 @@ function renderModels(models) {
       <article class="model-item ${escapeHtml(item.status || "")}">
         <div class="name">${escapeHtml(item.model_name || "model")}</div>
         <div class="meta">
-          ${escapeHtml(item.tone_title || "tone")} • ${escapeHtml(item.status || "unknown")} • ${item.size_mb ?? 0} MB
+          ${escapeHtml(item.tone_title || "tone")} - ${escapeHtml(item.status || "unknown")} - ${item.size_mb ?? 0} MB
         </div>
       </article>
     `
@@ -103,15 +148,20 @@ function getInvoke() {
 
 function collectPayload() {
   const request = el.toneRequest.value.trim();
-  if (!request) throw new Error("Tone isteği boş olamaz.");
+  if (!request) throw new Error("Tone istegi bos olamaz.");
 
   const maxTones = Number(el.maxTones.value || 3);
   const maxResults = Number(el.maxResults.value || 15);
   if (Number.isNaN(maxTones) || maxTones < 1 || maxTones > 5) {
-    throw new Error("Maks ton sayısı 1-5 aralığında olmalı.");
+    throw new Error("Maks ton sayisi 1-5 araliginda olmali.");
   }
   if (Number.isNaN(maxResults) || maxResults < 5 || maxResults > 25) {
-    throw new Error("Aday ton limiti 5-25 aralığında olmalı.");
+    throw new Error("Aday ton limiti 5-25 araliginda olmali.");
+  }
+
+  const geminiModel = (el.geminiModel.value || "gemini-2.5-pro").trim();
+  if (!geminiModel) {
+    throw new Error("Gemini modeli bos birakilamaz.");
   }
 
   return {
@@ -119,6 +169,7 @@ function collectPayload() {
     outputDir: (el.outputDir.value || "./smart_downloaded_tones").trim(),
     maxTones,
     maxResults,
+    geminiModel,
     tone3000ApiKey: el.tone3000Key.value.trim() || null,
     geminiApiKey: el.geminiKey.value.trim() || null,
   };
@@ -129,7 +180,7 @@ async function onRun() {
 
   const invoke = getInvoke();
   if (!invoke) {
-    setRunState("error", "Tauri runtime bulunamadı. Bu ekranı Tauri uygulaması üzerinden aç.");
+    setRunState("error", "Tauri runtime bulunamadi. Bu ekrani Tauri uygulamasi uzerinden ac.");
     return;
   }
 
@@ -142,28 +193,27 @@ async function onRun() {
   }
 
   setRunningState(true);
-  setRunState("running", "AI analiz ve indirme akışı çalışıyor...");
+  setRunState("running", "AI analiz ve indirme akisi calisiyor...");
 
   try {
     const response = await invoke("run_download", { payload });
     if (!response?.ok) {
-      const msg = response?.error || "İşlem başarısız oldu.";
+      const msg = response?.error || "Islem basarisiz oldu.";
       setRunState("error", msg);
       renderAnalysis(null);
-      renderTones([]);
+      renderAiSteps([]);
+      renderTones([], []);
       renderModels([]);
       el.logOutput.textContent = response?.logs || msg;
       return;
     }
 
-    renderAnalysis(response.analysis, response.pool_size);
-    renderTones(response.selected_tones);
+    renderAnalysis(response.analysis, response.pool_size, response.gemini_model);
+    renderAiSteps(response.ai_steps);
+    renderTones(response.rig_presets, response.selected_tones);
     renderModels(response.model_items);
-    el.logOutput.textContent = response.logs || "Log alınamadı.";
-    setRunState(
-      "done",
-      `Tamamlandı. ${response.downloaded_count} model indirildi. Çıktı: ${response.output_dir}`
-    );
+    el.logOutput.textContent = response.logs || "Log alinamadi.";
+    setRunState("done", `Tamamlandi. ${response.downloaded_count} model indirildi. Cikti: ${response.output_dir}`);
   } catch (err) {
     const msg = typeof err === "string" ? err : err?.message || "Bilinmeyen hata";
     setRunState("error", msg);
@@ -179,7 +229,8 @@ function onClearLogs() {
 
 function init() {
   renderAnalysis(null);
-  renderTones([]);
+  renderAiSteps([]);
+  renderTones([], []);
   renderModels([]);
   el.runButton.addEventListener("click", onRun);
   el.clearLogsButton.addEventListener("click", onClearLogs);
